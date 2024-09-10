@@ -3,6 +3,7 @@ package api
 import (
 	"encoding/json"
 	"net/http"
+	"sync"
 
 	"github.com/go-chi/chi"
 	"github.com/go-chi/chi/middleware"
@@ -37,18 +38,13 @@ func NewHandler() http.Handler {
 	return r
 }
 
-func getAllUsers(db map[string]User) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		sendJSON(w, Response{Data: db}, http.StatusOK)
-	}
-}
-
 func createUser(db map[string]User) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		mu.Lock()
 		var body User
 
 		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-			sendJSON(w, Response{Error: "Invalid body"}, http.StatusUnprocessableEntity)
+			sendJSON(w, Response{Message: "Please provide FirstName LastName and bio for the user"}, http.StatusBadRequest)
 			return
 		}
 
@@ -63,63 +59,78 @@ func createUser(db map[string]User) http.HandlerFunc {
 		db[id] = user
 
 		sendJSON(w, Response{Data: id}, http.StatusCreated)
+		mu.Unlock()
+	}
+}
 
+var mu sync.Mutex
+
+func getAllUsers(db map[string]User) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		mu.Lock()
+		sendJSON(w, Response{Data: db}, http.StatusOK)
+		mu.Unlock()
 	}
 }
 
 func getSpecificUser(db map[string]User) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		mu.Lock()
 		id := chi.URLParam(r, "id")
 
 		data, ok := db[id]
 
 		if !ok {
-			sendJSON(w, Response{Error: "user not found"}, http.StatusNotFound)
+			sendJSON(w, Response{Message: "The user with the specified ID does not exist"}, http.StatusNotFound)
 			return
 		}
 
 		sendJSON(w, Response{Data: data}, http.StatusOK)
+		mu.Unlock()
 	}
 }
 
 func deleteUser(db map[string]User) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		mu.Lock()
 		id := chi.URLParam(r, "id")
 
 		data, ok := db[id]
 
 		if !ok {
-			sendJSON(w, Response{Error: "user not found"}, http.StatusNotFound)
+			sendJSON(w, Response{Message: "The user with the specified ID does not exist"}, http.StatusNotFound)
 			return
 		}
 
 		delete(db, id)
 
 		sendJSON(w, Response{Data: data}, http.StatusOK)
+		mu.Unlock()
 	}
 }
 
 func updateUser(db map[string]User) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		mu.Lock()
 		id := chi.URLParam(r, "id")
 
 		_, ok := db[id]
 
 		if !ok {
-			sendJSON(w, Response{Error: "user not found"}, http.StatusNotFound)
+			sendJSON(w, Response{Message: "The user with the specified ID does not exist"}, http.StatusNotFound)
 			return
 		}
 
 		var body User
 
 		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-			sendJSON(w, Response{Error: "Invalid body"}, http.StatusUnprocessableEntity)
+			sendJSON(w, Response{Message: "Please provide name and bio for the user"}, http.StatusUnprocessableEntity)
 			return
 		}
 
 		db[id] = body
 
 		sendJSON(w, Response{Data: body}, http.StatusOK)
-
+		mu.Unlock()
 	}
 }

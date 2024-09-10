@@ -7,8 +7,8 @@ import (
 )
 
 type Response struct {
-	Error string `json:"error,omitempty"`
-	Data  any    `json:"data,omitempty"`
+	Message string `json:"error,omitempty"`
+	Data    any    `json:"data,omitempty"`
 }
 
 func sendJSON(w http.ResponseWriter, resp Response, status int) {
@@ -19,7 +19,7 @@ func sendJSON(w http.ResponseWriter, resp Response, status int) {
 		slog.Error("failed to marshal json data", "error", err)
 		sendJSON(
 			w,
-			Response{Error: "something went wrong"},
+			Response{Message: "something went wrong"},
 			http.StatusInternalServerError,
 		)
 		return
